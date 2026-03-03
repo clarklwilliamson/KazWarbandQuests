@@ -14,6 +14,11 @@ C_QuestLog.IsQuestFlaggedCompleted = function(questId)
         return true
     end
     if enabled and questId then
+        -- Skip profession KP quests — they're per-character, every crafter
+        -- needs to do them even if another toon already completed them
+        if KAZ_PROFESSION_QUEST_IDS and KAZ_PROFESSION_QUEST_IDS[questId] then
+            return false
+        end
         return C_QuestLog.IsQuestFlaggedCompletedOnAccount(questId)
     end
     return false
