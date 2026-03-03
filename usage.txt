@@ -1,0 +1,12 @@
+KazWarbandQuests - Makes Dugi skip warband-completed quests
+
+Hooks C_QuestLog.IsQuestFlaggedCompleted so Dugi treats warband-completed
+quests as done on all characters. Excludes profession KP quests (those are
+per-character and every crafter needs to do them).
+
+Commands:
+  /kwbq               Toggle on/off
+  /kwbq on            Enable
+  /kwbq off           Disable
+
+  /kaz warband        Same as /kwbq
