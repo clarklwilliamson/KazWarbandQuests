@@ -4,12 +4,24 @@
 -- Toggle: /kwbq or /kaz warband
 
 local addonName = ...
+local KazUtil = LibStub("KazUtil-1.0")
+local Print = KazUtil.CreatePrinter("KazWarbandQuests")
 local enabled = true
 
 -- Hook the Blizzard API directly — Dugi calls it in 7+ places, not just
 -- through IsQuestTurnedIn. This catches every code path.
 local origIsQuestFlaggedCompleted = C_QuestLog.IsQuestFlaggedCompleted
 C_QuestLog.IsQuestFlaggedCompleted = function(questId)
+    -- Profession KP quests: per-character, NOT warband.
+    -- In 12.0, origIsQuestFlaggedCompleted includes account-wide flags,
+    -- so profession quests show as done on alts. Use our own per-character
+    -- tracking (KAZ_CHAR_QUEST_DONE from KazWeeklyKnowledge) instead.
+    if questId and KAZ_PROFESSION_QUEST_IDS and KAZ_PROFESSION_QUEST_IDS[questId] then
+        if KAZ_CHAR_QUEST_DONE and KAZ_CHAR_QUEST_DONE[questId] then
+            return true
+        end
+        return false
+    end
     if origIsQuestFlaggedCompleted(questId) then
         return true
     end
@@ -18,41 +30,36 @@ C_QuestLog.IsQuestFlaggedCompleted = function(questId)
         if C_CampaignInfo and C_CampaignInfo.IsCampaignQuest(questId) then
             return false
         end
-        -- Skip profession KP quests — per-character, every crafter needs them
-        if KAZ_PROFESSION_QUEST_IDS and KAZ_PROFESSION_QUEST_IDS[questId] then
-            return false
-        end
         return C_QuestLog.IsQuestFlaggedCompletedOnAccount(questId)
     end
     return false
 end
 
-local f = CreateFrame("Frame")
-f:RegisterEvent("ADDON_LOADED")
-f:SetScript("OnEvent", function(_, _, addon)
+local frame, handlers, register = KazUtil.CreateEventHandler()
+
+function handlers.ADDON_LOADED(addon)
     if addon ~= addonName then return end
+    local db = KazUtil.InitDB("KazWarbandQuestsDB", { enabled = true })
+    enabled = db.enabled
+    frame:UnregisterEvent("ADDON_LOADED")
+end
 
-    -- SavedVariables
-    KazWarbandQuestsDB = KazWarbandQuestsDB or { enabled = true }
-    enabled = KazWarbandQuestsDB.enabled
-
-    f:UnregisterEvent("ADDON_LOADED")
-end)
+register("ADDON_LOADED")
 
 -- Slash commands
 local function PrintStatus()
     local state = enabled and "|cff00ff00ON|r" or "|cffff4444OFF|r"
-    print("|cffC8AA64KazWarbandQuests:|r " .. state .. " — warband-completed quests count as done")
+    Print(state .. " — warband-completed quests count as done")
 end
 
 SLASH_KAZWARBANDQUESTS1 = "/kwbq"
 SlashCmdList["KAZWARBANDQUESTS"] = function(msg)
-    msg = strtrim(msg):lower()
-    if msg == "on" then
+    local cmd = KazUtil.ParseCommand(msg)
+    if cmd == "on" then
         enabled = true
         KazWarbandQuestsDB.enabled = true
         PrintStatus()
-    elseif msg == "off" then
+    elseif cmd == "off" then
         enabled = false
         KazWarbandQuestsDB.enabled = false
         PrintStatus()
